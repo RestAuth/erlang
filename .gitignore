@@ -2,3 +2,4 @@ deps/
 *.beam
 doc/
 *.swp
+ebin/

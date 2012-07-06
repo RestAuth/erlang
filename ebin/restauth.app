@@ -1,9 +1,0 @@
-{application,restauth,
-             [{description,[]},
-              {vsn,"1"},
-              {registered,[]},
-              {applications,[kernel,stdlib,httpc]},
-              {mod,{restauth_app,[]}},
-              {env,[]},
-              {modules,[restauth,restauth_app,restauth_connection,
-                        restauth_sup]}]}.
