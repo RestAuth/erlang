@@ -42,7 +42,32 @@ translate_code(406) -> not_acceptable;
 translate_code(409) -> conflict;
 translate_code(411) -> length_required;
 translate_code(412) -> precondition_failed;
-translate_code(415) -> unsupported_media_type.
+translate_code(415) -> unsupported_media_type;
+translate_code(500) -> internal_server_error.
+
+defaultHeaders(User, Password) ->
+    [{"Authorization","Basic " ++ base64:encode_to_string(lists:append([User,":",Password]))},
+        {"Accept", "application/json"}].
+
+http_request({Host, User, Password}, Method, Url, Headers, null) ->
+    ReUrl = assemble_url(Host, Url),
+    DefaultHeaders = defaultHeaders(User, Password),
+    case httpc:request(Method, {ReUrl, Headers++DefaultHeaders},[],[]) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, {{_HttpVer, StatusCode, _Phrase}, NewHeaders, NewBody}} ->
+            {translate_code(StatusCode), NewHeaders, NewBody}
+    end;
+http_request({Host, User, Password}, Method, Url, Headers, Body) ->
+    ReUrl = assemble_url(Host, Url),
+    B = jiffy:encode(Body),
+    DefaultHeaders = defaultHeaders(User, Password),
+    case httpc:request(Method, {ReUrl, Headers++DefaultHeaders, "application/json", B},[],[]) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, {{_HttpVer, StatusCode, _Phrase}, NewHeaders, NewBody}} ->
+            {translate_code(StatusCode), NewHeaders, NewBody}
+    end.
 
 %% @doc Starts a gen_server which represents a connetion 
 %%      to an RestAuth server.
@@ -66,14 +91,12 @@ handle_info(_Info, State) ->
 
 handle_call(close, _From, State) ->
     {stop, normal, ok, State};
-
-handle_call({get, Url, Headers}, _From, {Host, User, Password}) ->
-    S = {Host, User, Password},
-    DefaultHeaders = [{"Accept", "application/json"}],
-    case httpc:request(get, {assemble_url(Host, Url), Headers++DefaultHeaders},[],[]) of
-        {error, Reason} ->
-            {reply, {error, Reason}, S};
-        {ok, {{_HttpVer, StatusCode, _Phrase}, NewHeaders, Body}} ->
-            {reply, {translate_code(StatusCode), NewHeaders, Body}, S} 
-    end.
-        
+    
+handle_call({get, Url, Headers}, _From, S) ->
+    {reply, http_request(S, get, Url, Headers, null), S};
+handle_call({delete, Url, Headers}, _From, S) ->
+    {reply, http_request(S, delete, Url, Headers, null), S};
+handle_call({post, Url, Body, Headers}, _From, S) ->
+    {reply, http_request(S, post, Url, Headers, Body), S};
+handle_call({put, Url, Body, Headers}, _From, S) ->
+    {reply, http_request(S, put, Url, Headers, Body), S}.

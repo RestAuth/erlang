@@ -19,10 +19,15 @@ disconnect_test() ->
 request_test_() ->
     {setup, fun() -> application:start(inets) end, [
         {"Wrong URL", fun() -> Pid = restauth:connect("http://foobar", restUser(), restPassword()), 
-                ?assertThrow({http_error, _Reason}, restauth:get(Pid, "foo")) end},
+            ?assertThrow({http_error, _Reason}, restauth:get(Pid, "foo")) end},
+        {"Valid GET request", fun() -> Pid = restauth:connect(restHost(), restUser(), restPassword()), 
+            ?assertMatch({ok, _Header, _Body}, restauth:get(Pid, "/users/")) end},
         lists:map(fun(P) -> {"Wrong creditionals for: "++P, 
                         fun() -> Pid = restauth:connect(restHost(), "wrong", "credentials"),
                             ?assertMatch({unauthorized, _, _}, restauth:get(Pid, P)) end
-                } end, allPaths())
+                } end, allPaths()),
+        {"Bad Request", fun() -> Pid = restauth:connect(restHost(), restUser(), restPassword()), 
+                    R = restauth:post(Pid, "/users/", {[{<<"bad">>, <<"request">>}]}),
+                    ?assertMatch({bad_request, _, _}, R) end}
         ]}.
 
