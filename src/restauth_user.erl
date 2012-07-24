@@ -14,7 +14,13 @@ add_group(Connection, User, Group) -> not_implemented.
 %% @doc Create a new property for the user. 
 %%      This method fails if the property already exists (returning {error, conflict}).
 -spec create_property(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-create_property(Connection, User, Property, Value) -> not_implemented.
+create_property(Connection, User, Property, Value) -> 
+    UserUrl = urlencode:escape_uri(User),
+    Body = {[{prop, Property},{value, Value}]},
+    case restauth:post(Connection, "/users/"++UserUrl++"/props/", Body) of
+        {ok, _H, B} -> ok;
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Get all groups that the user is a member of.
 -spec get_groups(restauth:connection(), unicode:unicode_binary()) -> list(unicode:unicode_binary()) | {error, restauth:response_code()}.
@@ -34,7 +40,15 @@ get_properties(Connection, User) ->
 
 %% @doc Get the value for given property for the user.
 -spec get_property(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> unicode:unicode_binary() | {error, restauth:response_code()}.
-get_property(Connection, User, Property) -> not_implemented.
+get_property(Connection, User, Property) -> 
+    UserUrl = urlencode:escape_uri(User),
+    PropertyUrl = urlencode:escape_uri(Property),
+    case restauth:get(Connection, "/users/"++UserUrl++"/props/"++PropertyUrl++"/") of
+        {ok, _H, B} -> 
+            [Str] = jiffy:decode(B),
+            Str;
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Check if the user is a member in the given group.
 -spec in_group(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> boolean() | {error, restauth:response_code()}.
@@ -45,7 +59,7 @@ in_group(Connection, User, Group) -> not_implemented.
 remove(Connection, User) -> 
     UserUrl = urlencode:escape_uri(User),
     case restauth:delete(Connection, "/users/"++UserUrl++"/") of
-        {created, _H, _B} -> ok;
+        {no_content, _H, _B} -> ok;
         {R, _H, _B} -> {error, R}
     end.
 
@@ -55,7 +69,13 @@ remove_group(Connection, User, Group) -> not_implemented.
 
 %% @doc Delete the given property from the user.
 -spec remove_property(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-remove_property(Connection, User, Property) -> not_implemented.
+remove_property(Connection, User, Property) ->
+    UserUrl = urlencode:escape_uri(User),
+    PropertyUrl = urlencode:escape_uri(Property),
+    case restauth:delete(Connection, "/users/"++UserUrl++"/props/"++PropertyUrl++"/") of
+        {no_content, _H, _B} -> ok;
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Set the password of the user. If empty unicode:unicode_binary, the user is effectively disabled.
 -spec set_password(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
@@ -70,7 +90,16 @@ set_password(Connection, User, Password) ->
 
 %% @doc Set a property for the user. This method overwrites any previous entry.
 -spec set_property(restauth:connection(), unicode:unicode_binary(), property()) -> ok | {error, restauth:response_code()}.
-set_property(Connection, User, {Key, Value}) -> not_implemented.
+set_property(Connection, User, {Key, Value}) ->
+    UserUrl  = urlencode:escape_uri(User),
+    PropertyUrl  = urlencode:escape_uri(Key),
+    Body = {[{value, Value}]},
+    case restauth:put(Connection, "/users/"++UserUrl++"/props/"++PropertyUrl++"/", Body) of
+        {ok, _H, _B} -> ok;
+        {created, _H, _B} -> ok;
+        {Reason, _H, _B} ->
+            {error, Reason}
+    end.
 
 %% @doc Verify the given password.  'true' if the password is correct, 
 %%      'false' if the password is wrong or the user does not exist.
