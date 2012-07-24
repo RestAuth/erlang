@@ -23,10 +23,6 @@ user_test_() ->
                 [] = restauth_user:get_all_users(Pid), 
                 Pid        
         end, 
-        fun(Pid) -> 
-                Users = restauth_user:get_all_users(Pid),
-                lists:map(fun(U) -> restauth_user:remove(Pid, U) end, Users)
-        end, 
         fun(Pid) -> {foreach, fun() -> delete_all_users(Pid) end, [
         {"Create user", fun() -> 
             restauth_user:create_user(Pid, <<"mati">>, <<"password">>),
@@ -49,7 +45,7 @@ user_test_() ->
             ?assert(restauth_user:user_exists(Pid, username()))
           end},
         {"Create user without password", fun() -> 
-            restauth_user:create_user(Pid, username(), ""),
+            restauth_user:create_user(Pid, username(), <<"">>),
             ?assertEqual([username()], restauth_user:get_all_users(Pid)),
             ?assert(restauth_user:user_exists(Pid, username())),
             ?assertEqual(restauth_user:verify_password(Pid, username(), <<"">>), false),
@@ -77,7 +73,7 @@ user_test_() ->
           end},
         {"Remove user", fun() ->
             restauth_user:create_user(Pid, username(), password()),
-            restauth_user:remove(Pid, username()), 
+            ?assertEqual(ok, restauth_user:remove(Pid, username())), 
             ?assertEqual([], restauth_user:get_all_users(Pid)),
             ?assertNot(restauth_user:user_exists(Pid, username())),
             ?assertEqual(false, restauth_user:verify_password(Pid, username(), password()))
@@ -90,3 +86,68 @@ user_test_() ->
             ?assert(restauth_user:verify_password(Pid, <<"mati">>, password()))
           end}
         ]}end}.
+
+property_test_() ->
+    {setup, 
+        fun() -> application:start(inets), 
+                Pid = restauth:connect(restHost(), restUser(), restPassword()),
+                delete_all_users(Pid),
+                restauth_user:create_user(Pid, username(), password()),
+                Pid        
+        end, 
+        fun(Pid) ->
+            delete_all_users(Pid)
+        end,
+        fun(Pid) ->
+        {foreach, 
+            fun() -> 
+                Props= restauth_user:get_properties(Pid, username()),
+                lists:map(fun({K,_V}) -> restauth_user:remove_property(Pid,username(), K) end, Props)
+            end, 
+            [{"Create property", fun() -> 
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual([{propKey(), propVal()}], restauth_user:get_properties(Pid, username())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Create property twice", fun() ->
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual([{propKey(), propVal()}], restauth_user:get_properties(Pid, username())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
+                ?assertEqual({error, conflict}, restauth_user:create_property(Pid, username(), propKey(), <<"newval">>)),
+                ?assertEqual([{propKey(), propVal()}], restauth_user:get_properties(Pid, username())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Create invalid property", fun() ->
+                ?assertEqual({error, precondition_failed}, restauth_user:create_property(Pid, username(), <<"foo:bar">>, propVal()))
+              end},
+            {"Set property", fun() ->
+                ?assertEqual(ok, restauth_user:set_property(Pid, username(), {propKey(), <<"bla">>})),
+                ?assertEqual(<<"bla">>, restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Set property twice", fun() ->
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
+                ?assertEqual(ok, restauth_user:set_property(Pid, username(), {propKey(), <<"bla">>})),
+                ?assertEqual(<<"bla">>,  restauth_user:get_property(Pid, username(), propKey())),
+                ?assertEqual(ok, restauth_user:set_property(Pid, username(), {propKey(), <<"bla23">>})),
+                ?assertEqual(<<"bla23">>, restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Remove property", fun() -> 
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual([{propKey(), propVal()}], restauth_user:get_properties(Pid, username())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
+                restauth_user:remove_property(Pid, username(), propKey()),
+                ?assertEqual([], restauth_user:get_properties(Pid, username())),
+                ?assertEqual({error, not_found}, restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Remove property from wrong user", fun() -> 
+                restauth_user:create_user(Pid, <<"User 2">>, password()),
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual({error, not_found}, restauth_user:remove_property(Pid, <<"User 2">>, propKey())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
+                ?assertEqual([], restauth_user:get_properties(Pid, <<"User 2">>))
+              end}
+            ]
+        } end}.
+
+
