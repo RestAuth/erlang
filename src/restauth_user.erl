@@ -9,7 +9,8 @@
 
 %% @doc Make the user a member if the given group.
 -spec add_group(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-add_group(Connection, User, Group) -> not_implemented.
+add_group(Connection, User, Group) -> 
+    restauth_group:add_user(Connection, Group, User).
 
 %% @doc Create a new property for the user. 
 %%      This method fails if the property already exists (returning {error, conflict}).
@@ -18,13 +19,19 @@ create_property(Connection, User, Property, Value) ->
     UserUrl = urlencode:escape_uri(User),
     Body = {[{prop, Property},{value, Value}]},
     case restauth:post(Connection, "/users/"++UserUrl++"/props/", Body) of
-        {ok, _H, B} -> ok;
+        {ok, _H, _B} -> ok;
         {R, _H, _B} -> {error, R}
     end.
 
 %% @doc Get all groups that the user is a member of.
 -spec get_groups(restauth:connection(), unicode:unicode_binary()) -> list(unicode:unicode_binary()) | {error, restauth:response_code()}.
-get_groups(Connection, User) -> not_implemented.
+get_groups(Connection, User) -> 
+    UserUrl = urlencode:escape_uri(User),
+    case restauth:get(Connection, "/groups/\?user="++UserUrl) of
+        {ok, _H, B} -> 
+            jiffy:decode(B);
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Get all properties defined for the user.
 -spec get_properties(restauth:connection(), unicode:unicode_binary()) -> list(property()) | {error, restauth:response_code()}.
@@ -52,7 +59,8 @@ get_property(Connection, User, Property) ->
 
 %% @doc Check if the user is a member in the given group.
 -spec in_group(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> boolean() | {error, restauth:response_code()}.
-in_group(Connection, User, Group) -> not_implemented.
+in_group(Connection, User, Group) ->
+    restauth_group:is_member(Connection, Group, User).
 
 %% @doc Remove the user.
 -spec remove(restauth:connection(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
@@ -65,7 +73,8 @@ remove(Connection, User) ->
 
 %% @doc Remove the users membership from the given group.
 -spec remove_group(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-remove_group(Connection, User, Group) -> not_implemented.
+remove_group(Connection, User, Group) ->
+    restauth_group:remove_user(Connection, Group, User).
 
 %% @doc Delete the given property from the user.
 -spec remove_property(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.

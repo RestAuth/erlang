@@ -89,8 +89,7 @@ user_test_() ->
 
 property_test_() ->
     {setup, 
-        fun() -> application:start(inets), 
-                Pid = restauth:connect(restHost(), restUser(), restPassword()),
+        fun() -> Pid = restauth:connect(restHost(), restUser(), restPassword()),
                 delete_all_users(Pid),
                 restauth_user:create_user(Pid, username(), password()),
                 Pid        
@@ -150,4 +149,41 @@ property_test_() ->
             ]
         } end}.
 
-
+group_test_() ->
+    {setup, 
+        fun() -> Pid = restauth:connect(restHost(), restUser(), restPassword()),
+                delete_all_users(Pid),
+                restauth_user:create_user(Pid, username(), password()),
+                restauth_group:create(Pid, groupname()),
+                Pid        
+        end, 
+        fun(Pid) ->
+            Groups = restauth_group:get_all_groups(Pid),
+            lists:map(fun(G) -> restauth_group:remove(Pid,G) end, Groups),
+            delete_all_users(Pid)
+        end,
+        fun(Pid) ->
+        {foreach, 
+            fun() -> 
+                Groups = restauth_user:get_groups(Pid, username()),
+                lists:map(fun(G) -> restauth_user:remove_group(Pid,username(), G) end, Groups)
+            end, 
+            [{"Add group", fun() -> 
+                ?assertEqual(ok, restauth_user:add_group(Pid, username(), groupname())),
+                ?assertEqual([groupname()], restauth_user:get_groups(Pid, username()))
+              end},
+             {"In group", fun() -> 
+                ?assertEqual(false, restauth_user:in_group(Pid, username(), groupname())),
+                ?assertEqual(ok, restauth_user:add_group(Pid, username(), groupname())),
+                ?assertEqual(true, restauth_user:in_group(Pid, username(), groupname()))
+              end},
+             {"Remove group", fun() -> 
+                ?assertEqual(false, restauth_user:in_group(Pid, username(), groupname())),
+                ?assertEqual(ok, restauth_user:add_group(Pid, username(), groupname())),
+                ?assertEqual(true, restauth_user:in_group(Pid, username(), groupname())),
+                ?assertEqual(ok, restauth_user:remove_group(Pid, username(), groupname())),
+                ?assertEqual(false, restauth_user:in_group(Pid, username(), groupname())),
+                ?assertEqual([], restauth_user:get_groups(Pid, username()))
+              end}
+            ]
+        } end}.
