@@ -23,7 +23,14 @@ get_subgroups(Connection, Group) -> not_implemented.
 
 %% @doc Get a list of users which are members of a group.
 -spec get_members(restauth:conection(), unicode:unicode_binary()) -> [unicode:unicode_binary()] | {error, restauth:response_code()}.
-get_members(Connection, Group) -> not_implemented.
+get_members(Connection, Group) ->
+    GroupUrl = urlencode:escape_uri(Group),
+    case restauth:get(Connection, "/groups/"++GroupUrl++"/users/") of
+        {ok, _Header, Body} ->
+            jiffy:decode(Body);
+        {Reason, _H, _B} ->
+            {error, Reason}
+    end.
 
 %% @doc Check if the user is a member of a group.
 -spec is_member(restauth:conection(), unicode:unicode_binary(), unicode:unicode_binary()) -> boolean() | {error, restauth:response_code()}.
@@ -65,12 +72,19 @@ create(Connection, Group) ->
     Body = {[{group, Group}]},
     case restauth:post(Connection, "/groups/", Body) of
         {ok, _H, B} -> ok;
+        {created, _H, B} -> ok;
         {R, _H, _B} -> {error, R}
     end.
     
 %% @doc Tests if a group exists.
 -spec group_exists(restauth:connection(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-group_exists(Connection, Group) -> not_implemented.
+group_exists(Connection, Group) -> 
+    GroupUrl = urlencode:escape_uri(Group),
+    case restauth:get(Connection, "/groups/"++GroupUrl++"/") of
+        {not_found, _H, _B} -> false;
+        {no_content, _H, _B} -> true;
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Get a list of all groups.
 -spec get_all_groups(restauth:conection()) -> [unicode:unicode_binary()] | {error, restauth:response_code()}.
