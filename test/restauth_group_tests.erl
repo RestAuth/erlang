@@ -52,7 +52,7 @@ user_test_() ->
                 ?assertEqual({error, precondition_failed}, restauth_group:create(Pid, <<"foo/bar">>)),
                 ?assertEqual([], restauth_group:get_all_groups(Pid))
               end},
-            {"Add User", fun() -> 
+            {"Add user", fun() -> 
                 restauth_group:create(Pid, groupname_1()),
                 restauth_group:create(Pid, groupname_2()),
                 ?assertEqual([groupname_1(), groupname_2()], restauth_group:get_all_groups(Pid)),
@@ -70,6 +70,69 @@ user_test_() ->
                 ?assertNot(restauth_group:is_member(Pid, groupname_2(), username_1())),
                 ?assert(restauth_group:is_member(Pid, groupname_2(), username_2())),
                 ?assert(restauth_group:is_member(Pid, groupname_2(), username_3()))
+              end},
+          {"Add User to invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:add_user(Pid, groupname_1(), username_1())),
+                ?assertEqual([], restauth_group:get_all_groups(Pid)) 
+              end},
+          {"Add invalid user", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                ?assertEqual({error, not_found}, restauth_group:add_user(Pid, groupname_1(), <<"notexistent">>)),
+                ?assertNot(restauth_user:user_exists(Pid, <<"notexistent">>))
+              end},
+          {"Is member", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                ?assertEqual(false, restauth_group:is_member(Pid, groupname_1(), username_1())),
+                ?assertEqual(ok, restauth_group:add_user(Pid, groupname_1(), username_1())),
+                ?assert(restauth_group:is_member(Pid, groupname_1(), username_1()))
+              end},
+          {"Is Member of invalid group", fun() ->
+                ?assertEqual(false, restauth_group:is_member(Pid, groupname_1(), username_1()))
+            end},
+          {"Remove user", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                restauth_group:add_user(Pid, groupname_1(), username_1()),
+                restauth_group:add_user(Pid, groupname_1(), username_2()),
+                ?assertEqual(lists:sort([username_1(), username_2()]), lists:sort(restauth_group:get_members(Pid, groupname_1()))),
+                ?assertEqual(ok, restauth_group:remove_user(Pid, groupname_1(), username_1())),
+                ?assertEqual([username_2()], restauth_group:get_members(Pid, groupname_1())),
+                ?assertEqual(false, restauth_group:is_member(Pid, groupname_1(), username_1())),
+                ?assert(restauth_group:is_member(Pid, groupname_1(), username_2())),
+                ?assert(restauth_user:user_exists(Pid, username_1()))
+            end},
+          {"Remove user which is not a member", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                ?assertEqual({error, not_found}, restauth_group:remove_user(Pid, groupname_1(), username_1())),
+                ?assertNot(restauth_group:is_member(Pid, groupname_1(), username_2())),
+                ?assert(restauth_user:user_exists(Pid, username_1()))
+            end},
+          {"Remove invalid user", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                ?assertEqual({error, not_found}, restauth_group:remove_user(Pid, groupname_1(), <<"notexistent">>)),
+                ?assertNot(restauth_user:user_exists(Pid, <<"notexistent">>))
+              end},
+          {"Remove invalid user from invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:remove_user(Pid, groupname_1(), <<"notexistent">>)),
+                ?assertNot(restauth_user:user_exists(Pid, <<"notexistent">>)),
+                ?assertNot(restauth_user:group_exists(Pid, groupname_1()))
+              end},
+          {"Remove user from invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:remove_user(Pid, groupname_1(), username_1())),
+                ?assert(restauth_user:user_exists(Pid, username_1()))
+              end},
+          {"Remove group", fun() ->
+                restauth_group:create(Pid, groupname_1()),
+                ?assertEqual(ok, restauth_group:remove(Pid, groupname_1())),
+                ?assertEqual(false, restauth_group:group_exists(Pid, groupname_1())),
+                ?assertEqual([], restauth_group:get_all_groups(Pid))
+              end},
+          {"Remove invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:remove(Pid, groupname_1())),
+                ?assertEqual(false, restauth_group:group_exists(Pid, groupname_1())),
+                ?assertEqual([], restauth_group:get_all_groups(Pid))
+              end}, 
+          {"Get members invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:get_members(Pid, groupname_1()))
               end}
         ]}
         end}.  
