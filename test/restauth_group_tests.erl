@@ -23,14 +23,14 @@ cleanup(Pid) ->
     delete_groups(Pid).
 
 remove_members(Pid) ->
-    lists:map(fun(U) -> restauth_user:remove_user(Pid, groupname_1, U) end, 
-        restauth_user:get_members(Pid, groupname_1())),
-    lists:map(fun(U) -> restauth_user:remove_user(Pid, groupname_2, U) end, 
-        restauth_user:get_members(Pid, groupname_2())),
-    lists:map(fun(G) -> restauth_user:remove_subgroup(Pid, groupname_1, G) end, 
-        restauth_user:get_subgroups(Pid, groupname_1())),
-    lists:map(fun(G) -> restauth_user:remove_subgroup(Pid, groupname_2, G) end, 
-        restauth_user:get_subgroups(Pid, groupname_2())).
+    lists:map(fun(U) -> restauth_group:remove_user(Pid, groupname_1(), U) end, 
+        restauth_group:get_members(Pid, groupname_1())),
+    lists:map(fun(U) -> restauth_group:remove_user(Pid, groupname_2(), U) end, 
+        restauth_group:get_members(Pid, groupname_2())),
+    lists:map(fun(G) -> restauth_group:remove_subgroup(Pid, groupname_1(), G) end, 
+        restauth_group:get_subgroups(Pid, groupname_1())),
+    lists:map(fun(G) -> restauth_group:remove_subgroup(Pid, groupname_2(), G) end, 
+        restauth_group:get_subgroups(Pid, groupname_2())).
 
 user_test_() ->
     {setup, 
@@ -173,17 +173,44 @@ metagroup_test_() ->
                 % make group 2 a subgroup of group 1
                 ?assertEqual(ok, restauth_group:add_subgroup(Pid, groupname_1(), groupname_2())),
                 ?assertEqual([username_1()], restauth_group:get_members(Pid, groupname_1())),
-                ?assertEqual([username_2()], restauth_group:get_members(Pid, groupname_2())),
                 ?assertEqual(lists:sort([username_1(), username_2()]), lists:sort(restauth_group:get_members(Pid, groupname_2()))),
                 ?assert(restauth_group:is_member(Pid, groupname_2(), username_1())),
                 ?assert(restauth_group:is_member(Pid, groupname_2(), username_2())),
 
-                ?assertEqual([groupname_2], restauth_group:get_subgroups(Pid, groupname_1())),
+                ?assertEqual([groupname_2()], restauth_group:get_subgroups(Pid, groupname_1())),
                 ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_2()))
               end},
             {"Add invalid group", fun() -> 
-                ?assertEqual({error, not_found}, restauth_group:add_subgroup(pid, groupname_1(), groupname_3())),
+                ?assertEqual({error, not_found}, restauth_group:add_subgroup(Pid, groupname_1(), groupname_3())),
                 ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_1()))
+              end},
+            {"Add group to invalid group", fun() -> 
+                ?assertEqual({error, not_found}, restauth_group:add_subgroup(Pid, groupname_3(), groupname_1())),
+                ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_1()))
+              end},
+            {"Remove group", fun() ->
+                ?assertEqual(ok, restauth_group:add_user(Pid, groupname_1(), username_1())),
+
+                ?assertEqual(ok, restauth_group:add_subgroup(Pid, groupname_1(), groupname_2())),
+                ?assertEqual([groupname_2()], restauth_group:get_subgroups(Pid, groupname_1())),
+                ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_2())),
+                ?assertEqual([username_1()], restauth_group:get_members(Pid, groupname_1())),
+                ?assertEqual([username_1()], restauth_group:get_members(Pid, groupname_2())),
+                
+                ?assertEqual(ok, restauth_group:remove_subgroup(Pid, groupname_1(), groupname_2())),
+                ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_1())),
+                ?assertEqual([], restauth_group:get_subgroups(Pid, groupname_2())),
+                ?assertEqual([username_1()], restauth_group:get_members(Pid, groupname_1())),
+                ?assertEqual([], restauth_group:get_members(Pid, groupname_2()))
+              end},
+            {"Remove group not member", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:remove_subgroup(Pid, groupname_1(), groupname_2()))
+              end},
+            {"Remove invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:remove_subgroup(Pid, groupname_1(), groupname_3()))
+              end},
+            {"Get subgroups of invalid group", fun() ->
+                ?assertEqual({error, not_found}, restauth_group:get_subgroups(Pid, groupname_3()))
               end}
     ]}end}.
 
