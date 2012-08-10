@@ -29,10 +29,13 @@ user_test_() ->
             ?assertEqual([<<"mati">>], restauth_user:get_all_users(Pid)),
             ?assert(restauth_user:user_exists(Pid, <<"mati">>))
           end},
-        {"Vierify password", fun() -> 
+        {"Verify password", fun() -> 
             restauth_user:create_user(Pid, <<"mati">>, <<"password">>),
             ?assert(restauth_user:verify_password(Pid, <<"mati">>, <<"password">>)),
             ?assertNot(restauth_user:verify_password(Pid, <<"mati">>, <<"not password">>))
+          end},
+        {"Verify password invalid user", fun() -> 
+            ?assertEqual(false, restauth_user:verify_password(Pid, <<"mati">>, <<"password">>))
           end},
         {"Create user with space", fun() -> 
             restauth_user:create_user(Pid, <<"mati space">>, <<"password">>),
@@ -67,9 +70,12 @@ user_test_() ->
             restauth_user:create_user(Pid, <<"mati">>, <<"password">>),
             ?assert(restauth_user:verify_password(Pid, <<"mati">>, <<"password">>)),
             ?assertNot(restauth_user:verify_password(Pid, <<"mati">>, <<"not password">>)),
-            restauth_user:set_password(Pid, <<"mati">>, <<"not password">>),
+            ?assertEqual(ok, restauth_user:set_password(Pid, <<"mati">>, <<"not password">>)),
             ?assertNot(restauth_user:verify_password(Pid, <<"mati">>, <<"password">>)),
             ?assert(restauth_user:verify_password(Pid, <<"mati">>, <<"not password">>))
+          end},
+        {"Set password invalid user", fun() -> 
+            ?assertEqual({error, not_found}, restauth_user:set_password(Pid, <<"mati">>, <<"not password">>))
           end},
         {"Remove user", fun() ->
             restauth_user:create_user(Pid, username(), password()),
@@ -77,6 +83,9 @@ user_test_() ->
             ?assertEqual([], restauth_user:get_all_users(Pid)),
             ?assertNot(restauth_user:user_exists(Pid, username())),
             ?assertEqual(false, restauth_user:verify_password(Pid, username(), password()))
+          end},
+        {"Remove invalid user", fun() ->
+            ?assertEqual({error, not_found}, restauth_user:remove(Pid, username()))
           end},
         {"User created twice", fun() -> 
             restauth_user:create_user(Pid, <<"mati">>, password()),
@@ -119,6 +128,10 @@ property_test_() ->
             {"Create invalid property", fun() ->
                 ?assertEqual({error, precondition_failed}, restauth_user:create_property(Pid, username(), <<"foo:bar">>, propVal()))
               end},
+            {"Create property with invalid user", fun() -> 
+                ?assertEqual({error, not_found}, restauth_user:create_property(Pid, <<"notexistent">>, propKey(), propVal())),
+                ?assertEqual([username()], restauth_user:get_all_users(Pid))
+              end},
             {"Set property", fun() ->
                 ?assertEqual(ok, restauth_user:set_property(Pid, username(), {propKey(), <<"bla">>})),
                 ?assertEqual(<<"bla">>, restauth_user:get_property(Pid, username(), propKey()))
@@ -139,13 +152,28 @@ property_test_() ->
                 ?assertEqual([], restauth_user:get_properties(Pid, username())),
                 ?assertEqual({error, not_found}, restauth_user:get_property(Pid, username(), propKey()))
               end},
+            {"Remove invalid property", fun() -> 
+                restauth_user:create_property(Pid, username(), propKey(), propVal()),
+                ?assertEqual({error, not_found}, restauth_user:remove_property(Pid, username(), <<"bla">>)),
+                ?assertEqual([{propKey(), propVal()}], restauth_user:get_properties(Pid, username())),
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Remove property invalid user", fun() -> 
+                ?assertEqual({error, not_found}, restauth_user:remove_property(Pid, <<"foo">>, <<"bar">>))
+              end},
             {"Remove property from wrong user", fun() -> 
                 restauth_user:create_user(Pid, <<"User 2">>, password()),
                 restauth_user:create_property(Pid, username(), propKey(), propVal()),
                 ?assertEqual({error, not_found}, restauth_user:remove_property(Pid, <<"User 2">>, propKey())),
                 ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
                 ?assertEqual([], restauth_user:get_properties(Pid, <<"User 2">>))
-              end}
+              end},
+            {"Get invalid property", fun() ->
+                ?assertEqual({error, not_found}, restauth_user:get_property(Pid, username(), propKey()))
+              end},
+            {"Get property invalid user", fun() ->
+                ?assertEqual({error, not_found}, restauth_user:get_property(Pid, <<"foo">>, propKey()))
+              end} 
             ]
         } end}.
 
@@ -184,6 +212,9 @@ group_test_() ->
                 ?assertEqual(ok, restauth_user:remove_group(Pid, username(), groupname())),
                 ?assertEqual(false, restauth_user:in_group(Pid, username(), groupname())),
                 ?assertEqual([], restauth_user:get_groups(Pid, username()))
+              end},
+             {"Get groups invalid user", fun() ->
+                ?assertEqual({error, not_found}, restauth_user:get_groups(Pid, <<"foo">>))
               end}
             ]
         } end}.
