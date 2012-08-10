@@ -5,7 +5,14 @@
 
 %% @doc Add a sub-group to a group.
 -spec add_subgroup(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-add_subgroup(Connection, Group, SubGroup) -> not_implemented.
+add_subgroup(Connection, Group, SubGroup) ->
+    GroupUrl = urlencode:escape_uri(Group),
+    Body = {[{group, SubGroup}]},
+    case restauth:post(Connection, "/groups/"++GroupUrl++"/groups/", Body) of
+        {no_content, _H, _B} -> ok;
+        {R, _H, _B} -> {error, R}
+    end.
+
 
 %% @doc Add a user to a group.
 -spec add_user(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
@@ -19,7 +26,14 @@ add_user(Connection, Group, User) ->
 
 %% @doc Get a list of sub-groups of a group.
 -spec get_subgroups(restauth:conection(), unicode:unicode_binary()) -> [unicode:unicode_binary()] | {error, restauth:response_code()}.
-get_subgroups(Connection, Group) -> not_implemented.
+get_subgroups(Connection, Group) -> 
+    GroupUrl = urlencode:escape_uri(Group),
+    case restauth:get(Connection, "/groups/"++GroupUrl++"/groups/") of
+        {ok, _Header, Body} ->
+            jiffy:decode(Body);
+        {Reason, _H, _B} ->
+            {error, Reason}
+    end.
 
 %% @doc Get a list of users which are members of a group.
 -spec get_members(restauth:conection(), unicode:unicode_binary()) -> [unicode:unicode_binary()] | {error, restauth:response_code()}.
@@ -54,7 +68,13 @@ remove(Connection, Group) ->
 
 %% @doc Delete a sub-group from a group.
 -spec remove_subgroup(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
-remove_subgroup(Connection, Group, SubGroup) -> not_implemented.
+remove_subgroup(Connection, Group, SubGroup) -> 
+    GroupUrl = urlencode:escape_uri(Group),
+    SubGroupUrl = urlencode:escape_uri(SubGroup),
+    case restauth:delete(Connection, "/groups/"++GroupUrl++"/groups/"++SubGroupUrl++"/") of
+        {no_content, _H, _B} -> ok;
+        {R, _H, _B} -> {error, R}
+    end.
 
 %% @doc Delete a user from a group.
 -spec remove_user(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
