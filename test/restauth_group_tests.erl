@@ -65,14 +65,14 @@ user_test_() ->
             {"Add user", fun() -> 
                 restauth_group:create(Pid, groupname_1()),
                 restauth_group:create(Pid, groupname_2()),
-                ?assertEqual([groupname_1(), groupname_2()], restauth_group:get_all_groups(Pid)),
+                ?assertEqual(lists:sort([groupname_1(), groupname_2()]), lists:sort(restauth_group:get_all_groups(Pid))),
 
                 ?assertEqual(ok, restauth_group:add_user(Pid, groupname_1(), username_1())),
                 ?assertEqual(ok, restauth_group:add_user(Pid, groupname_2(), username_2())),
                 ?assertEqual(ok, restauth_group:add_user(Pid, groupname_2(), username_3())),
 
                 ?assertEqual([username_1()], restauth_group:get_members(Pid, groupname_1())),
-                ?assertEqual([username_3(), username_2()], restauth_group:get_members(Pid, groupname_2())),
+                ?assertEqual(lists:sort([username_2(), username_3()]), lists:sort(restauth_group:get_members(Pid, groupname_2()))),
 
                 ?assert(restauth_group:is_member(Pid, groupname_1(), username_1())),
                 ?assertNot(restauth_group:is_member(Pid, groupname_1(), username_2())),
