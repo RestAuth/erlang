@@ -12,6 +12,15 @@ propKey() -> unicode:characters_to_binary("mati \x{17e0}").
 propVal() -> unicode:characters_to_binary("mati \x{17e1}").
 groupname() -> unicode:characters_to_binary("group \x{17e2}").
 
+propKey2() -> unicode:characters_to_binary("mati \x{17e2}").
+propVal2() -> unicode:characters_to_binary("mati \x{17e3}").
+propKey3() -> unicode:characters_to_binary("mati \x{17e4}").
+propVal3() -> unicode:characters_to_binary("mati \x{17e5}").
+propKey4() -> unicode:characters_to_binary("mati \x{17e6}").
+propVal4() -> unicode:characters_to_binary("mati \x{17e7}").
+propKey5() -> unicode:characters_to_binary("mati \x{17e8}").
+propVal5() -> unicode:characters_to_binary("mati \x{17e9}").
+
 delete_all_users(Pid) ->
     Users = restauth_user:get_all_users(Pid),
     lists:map(fun(U) -> restauth_user:remove(Pid, U) end, Users).
@@ -59,7 +68,8 @@ user_test_() ->
             Pro = {propKey(), propVal()},
             restauth_user:create_user(Pid, username(), password(), [Pro]),
             ?assert(restauth_user:user_exists(Pid, username())),
-            ?assertEqual([Pro], restauth_user:get_properties(Pid, username()))
+            Properties = restauth_user:get_properties(Pid, username()),
+            ?assertEqual(Pro, lists:keyfind(propKey(), 1, Properties)) 
           end},
         {"Create invalid user", fun() -> 
             ?assertEqual(restauth_user:create_user(Pid, <<"invalid/user">>, <<"password">>),
@@ -165,8 +175,7 @@ property_test_() ->
                 restauth_user:create_user(Pid, <<"User 2">>, password()),
                 restauth_user:create_property(Pid, username(), propKey(), propVal()),
                 ?assertEqual({error, not_found}, restauth_user:remove_property(Pid, <<"User 2">>, propKey())),
-                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey())),
-                ?assertEqual([], restauth_user:get_properties(Pid, <<"User 2">>))
+                ?assertEqual(propVal(), restauth_user:get_property(Pid, username(), propKey()))
               end},
             {"Get invalid property", fun() ->
                 ?assertEqual({error, not_found}, restauth_user:get_property(Pid, username(), propKey()))
@@ -174,6 +183,75 @@ property_test_() ->
             {"Get property invalid user", fun() ->
                 ?assertEqual({error, not_found}, restauth_user:get_property(Pid, <<"foo">>, propKey()))
               end} 
+            ]
+        } end}.
+
+set_multiple_property_test_() ->
+    {setup, 
+        fun() -> Pid = restauth:connect(restHost(), restUser(), restPassword()),
+                delete_all_users(Pid),
+                restauth_user:create_user(Pid, username(), password()),
+                Pid        
+        end, 
+        fun(Pid) ->
+            delete_all_users(Pid)
+        end,
+        fun(Pid) ->
+        {foreach, 
+            fun() -> 
+                Props= restauth_user:get_properties(Pid, username()),
+                lists:map(fun({K,_V}) -> restauth_user:remove_property(Pid,username(), K) end, Props)
+            end,[ 
+            {"Set no properties", fun() ->
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), [])),
+                ?assertEqual([], restauth_user:get_properties(Pid, username()))
+                end},
+            {"Set one propertie", fun() ->
+                Properties = [{propKey(), propVal()}],
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties)),
+                ?assertEqual(Properties, restauth_user:get_properties(Pid, username()))
+                end},
+            {"Set two propertie", fun() ->
+                Properties = lists:sort([{propKey(), propVal()}, {propKey2(), propVal2()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties)),
+                ?assertEqual(Properties, restauth_user:get_properties(Pid, username())),
+
+                Properties2 = lists:sort([{propKey(), propVal2()}, {propKey2(), propVal()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties2)),
+                ?assertEqual(Properties2, restauth_user:get_properties(Pid, username()))
+                end},
+            {"Set three propertie", fun() ->
+                Properties = lists:sort([{propKey(), propVal()}, {propKey2(), propVal2()}, {propVal3(), propKey3()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties)),
+                ?assertEqual(Properties, lists:sort(restauth_user:get_properties(Pid, username()))),
+
+                Properties2 = lists:sort([{propKey(), propVal()}, {propKey2(), propVal2()}, {propVal3(), propKey3()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties2)),
+                ?assertEqual(Properties2, lists:sort(restauth_user:get_properties(Pid, username())))
+                end},
+            {"Set invalid propertie", fun() ->
+                Properties = [{<<"foo:bar">>, propVal()}],
+                ?assertEqual({error, precondition_failed}, restauth_user:set_properties(Pid, username(), Properties)),
+                ?assertNot(lists:keyfind(<<"foo:bar">>, 1, restauth_user:get_properties(Pid, username()))),
+
+                Properties2 = [{<<"foo:bar">>, propVal()}, {propKey2(), propVal2()}],
+                ?assertEqual({error, precondition_failed}, restauth_user:set_properties(Pid, username(), Properties2)),
+                ?assertNot(lists:keyfind(<<"foo:bar">>, 1, restauth_user:get_properties(Pid, username()))),
+                ?assertNot(lists:keyfind(propKey2(), 1, restauth_user:get_properties(Pid, username()))),
+
+                GoodProperties = [{propKey(), propVal()}],
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), GoodProperties)),
+                ?assertEqual(GoodProperties, restauth_user:get_properties(Pid, username()))
+                end},
+            {"Mixed set and create", fun() ->
+                Properties = lists:sort([{propKey(), propVal()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties)),
+                ?assertEqual(Properties, restauth_user:get_properties(Pid, username())),
+
+                Properties2 = lists:sort([{propKey(), propVal5()}, {propKey2(), propVal2()}, {propKey3(), propVal3()}]),
+                ?assertEqual(ok, restauth_user:set_properties(Pid, username(), Properties2)),
+                ?assertEqual(Properties2, lists:sort(restauth_user:get_properties(Pid, username())))
+                end}
             ]
         } end}.
 

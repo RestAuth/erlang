@@ -1,11 +1,12 @@
 -module(restauth_user).
 -include_lib("eunit/include/eunit.hrl").
 
--export([add_group/3, create_property/4, get_groups/2, get_properties/2, get_property/3, in_group/3, remove/2,
+-export([add_group/3, create_property/4, get_groups/2, get_properties/2, set_properties/3, get_property/3, in_group/3, remove/2,
         remove_group/3, remove_property/3, set_password/3, set_property/3, verify_password/3, create_user/3,
         create_user/4, get_all_users/1, user_exists/2]).
 -type property() :: {unicode:unicode_binary(), unicode:unicode_binary()}.
--export_type([property/0]).
+-type properties() :: list(property).
+-export_type([property/0, properties/0]).
 
 %% @doc Make the user a member if the given group.
 -spec add_group(restauth:connection(), unicode:unicode_binary(), unicode:unicode_binary()) -> ok | {error, restauth:response_code()}.
@@ -106,6 +107,17 @@ set_property(Connection, User, {Key, Value}) ->
     case restauth:put(Connection, "/users/"++UserUrl++"/props/"++PropertyUrl++"/", Body) of
         {ok, _H, _B} -> ok;
         {created, _H, _B} -> ok;
+        {Reason, _H, _B} ->
+            {error, Reason}
+    end.
+
+%% @doc Set multiple properties at once. This method overwrites any previous entry.
+-spec set_properties(restauth:connection(), unicode:unicode_binary(), properties()) -> ok | {error, restauth:response_code()}.
+set_properties(Connection, User, Properties) ->
+    UserUrl  = urlencode:escape_uri(User),
+    Body = {Properties},
+    case restauth:put(Connection, "/users/"++UserUrl++"/props/", Body) of
+        {no_content, _H, _B} -> ok;
         {Reason, _H, _B} ->
             {error, Reason}
     end.
